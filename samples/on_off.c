@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 
-#define DEVICE_NAME "/dev/my_device_-2143289282"
+#define DEVICE_NAME "/dev/my_gpio_device"
 
 struct ioctl_data {
     int mode;
@@ -19,12 +19,17 @@ int main(void)
   }
 
   struct ioctl_data data = {
-    .mode = 1, // write
+    .mode = 1, // out
     .pin_number = 4,
   };
   ioctl(file_descriptor, 0, &data);
   
-  char* mode = "0";
+  char* mode = "1"; // on
+  write(file_descriptor, mode, sizeof(char*));
+
+  sleep(1);
+
+  mode = "0";
   write(file_descriptor, mode, sizeof(char*));
 
   close(file_descriptor);

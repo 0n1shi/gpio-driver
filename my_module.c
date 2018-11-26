@@ -7,6 +7,7 @@
 #include <asm/uaccess.h>
 
 #define DRIVER_NAME "my_gpio_driver"
+#define DEVICE_NAME "my_gpio_device"
 
 #define GPFSEL0_OFFSET 0x0000 /* GPIO Function Select Registers (GPFSELn) */
 #define GPSET0_OFFSET 0x001C /* GPIO Pin Output Set Registers (GPSETn) */
@@ -25,9 +26,13 @@
 
 #define PIN_MODE_IN 0
 #define PIN_MODE_OUT 1
+#define PIN_MODE_IN_S '0'
+#define PIN_MODE_OUT_S '1'
 
-#define PIN_ON 1
-#define PIN_OFF 0
+#define PIN_STATE_ON 1
+#define PIN_STATE_OFF 0
+#define PIN_STATE_ON_S '1'
+#define PIN_STATE_OFF_S '0'
 
 #define WRITE_SEL(num, mode) (mode << (num * 3))
 #define WRITE_SET_CLR(num) (1 << num)
@@ -55,11 +60,11 @@ int pin_read(unsigned int pin_number);
 
 static int __init my_init(void);
 static void __exit my_exit(void);
-static int my_open(struct inode *inode, struct file *filp);
-static int my_close(struct inode *inode, struct file *filp);
-static ssize_t my_read(struct file * file, char * buff, size_t count, loff_t *pos);
-static ssize_t my_write(struct file * file, const char * buff, size_t count, loff_t *pos);
-static long my_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
+static int my_open(struct inode* inode, struct file* filp);
+static int my_close(struct inode* inode, struct file* filp);
+static ssize_t my_read(struct file* file, char* buff, size_t count, loff_t* pos);
+static ssize_t my_write(struct file* file, const char * buff, size_t count, loff_t *pos);
+static long my_ioctl(struct file* filp, unsigned int cmd, unsigned long arg);
 
 struct file_operations my_file_ops = {
   .owner = THIS_MODULE,
@@ -104,7 +109,7 @@ static int my_init(void)
   }
 
   /* register as a class */
-  my_char_dev_class = class_create(THIS_MODULE, "my_device");
+  my_char_dev_class = class_create(THIS_MODULE, DEVICE_NAME);
   if (IS_ERR(my_char_dev_class)) {
     printk(KERN_ERR "class_create()\n");
     cdev_del(&my_char_dev);
@@ -114,7 +119,7 @@ static int my_init(void)
   
   /* create "/sys/class/my_device/my_device_*" */
   for (int minor_number = MINOR_NUMBER_START; minor_number < NUMBER_MINOR_NUMBER; minor_number++) {
-    device_create(my_char_dev_class, NULL, MKDEV(major_number, minor_number), NULL, "my_device_%d");
+    device_create(my_char_dev_class, NULL, MKDEV(major_number, minor_number), NULL, DEVICE_NAME);
   }
   
   return 0;
@@ -141,7 +146,7 @@ static void my_exit(void)
   unregister_chrdev_region(dev, NUMBER_MINOR_NUMBER);
 }
 
-static int my_open(struct inode *inode, struct file *filp)
+static int my_open(struct inode* inode, struct file* filp)
 {
   printk(KERN_INFO "my_open() is called\n");
   base_address = (int)ioremap_nocache(GPIO_ADDRESS, PAGE_SIZE);
@@ -161,7 +166,7 @@ struct ioctl_data {
   unsigned int pin_number;
 };
 
-static long my_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+static long my_ioctl(struct file* filp, unsigned int cmd, unsigned long arg)
 {
   printk(KERN_INFO "my_ioctl() is called\n");
   struct ioctl_data* data = (struct ioctl_data*)arg;
@@ -191,10 +196,10 @@ static ssize_t my_write(struct file* file, const char* buff, size_t count, loff_
 
   printk("write pin, number:%d\n", pin_number);
 
-  if (mode == '1') {
+  if (mode == PIN_MODE_OUT_S) {
     printk("write mode:set\n");
     addr = base_address + GPSET0_OFFSET + (REG_GAP * num_reg);
-  } else if (mode == '0') {
+  } else if (mode == PIN_MODE_IN_S) {
     printk("write mode:clear\n");
     addr = base_address + GPCLR0_OFFSET + (REG_GAP * num_reg);
   }
@@ -204,7 +209,7 @@ static ssize_t my_write(struct file* file, const char* buff, size_t count, loff_
   return count;
 }
 
-static ssize_t my_read(struct file * file, char * buff, size_t count, loff_t *pos)
+static ssize_t my_read(struct file* file, char* buff, size_t count, loff_t *pos)
 {
   printk(KERN_INFO "my_read() is called\n");
 
@@ -215,7 +220,7 @@ static ssize_t my_read(struct file * file, char * buff, size_t count, loff_t *po
   printk("read pin, number:%d\n", pin_number);
 
   int value = ((MEMORY(addr) >> offset) & 1);
-  char return_val = (value == 0 ? '0' : '1');
+  char return_val = (value == 0 ? PIN_STATE_OFF_S : PIN_STATE_ON_S);
   put_user(return_val, &buff[0]);
   return count;
 }
