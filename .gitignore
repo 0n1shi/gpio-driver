@@ -1,3 +1,4 @@
+.tmp_versions/
 *.symvers
 *.ko
 *.o
