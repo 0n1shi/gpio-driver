@@ -1,0 +1,1 @@
+cmd_/home/pi/Projects/kmod/MyModule.ko := ld -EL -r  -T ./scripts/module-common.lds --build-id  -o /home/pi/Projects/kmod/MyModule.ko /home/pi/Projects/kmod/MyModule.o /home/pi/Projects/kmod/MyModule.mod.o ;  true
