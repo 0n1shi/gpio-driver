@@ -1,7 +1,7 @@
-Module.symvers
-MyModule.ko 
-MyModule.mod.c
-MyModule.mod.o
-MyModule.o
-modules.order
-my_module.o
+*.symvers
+*.ko
+*.o
+*.mod.c
+*.mod.o
+*.order
+*.cmd
