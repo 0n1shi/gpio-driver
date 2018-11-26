@@ -59,7 +59,7 @@ static int my_open(struct inode *inode, struct file *filp);
 static int my_close(struct inode *inode, struct file *filp);
 static ssize_t my_read(struct file * file, char * buff, size_t count, loff_t *pos);
 static ssize_t my_write(struct file * file, const char * buff, size_t count, loff_t *pos);
-static long my_ioctl(struct file *filp,unsigned int cmd, unsigned long arg);
+static long my_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
 
 struct file_operations my_file_ops = {
   .owner = THIS_MODULE,
@@ -145,6 +145,7 @@ static int my_open(struct inode *inode, struct file *filp)
 {
   printk(KERN_INFO "my_open() is called\n");
   base_address = (int)ioremap_nocache(GPIO_ADDRESS, PAGE_SIZE);
+  printk(KERN_INFO "base address: %0X\n", base_address);
   return 0;
 }
 
@@ -160,34 +161,44 @@ struct ioctl_data {
   unsigned int pin_number;
 };
 
-static long my_ioctl(struct file *filp,unsigned int cmd, unsigned long arg)
+static long my_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
   printk(KERN_INFO "my_ioctl() is called\n");
   struct ioctl_data* data = (struct ioctl_data*)arg;
   int mode = data->mode;
   pin_number = data->pin_number;
 
+  printk("pin number:%d, set mode:%s\n", pin_number, (mode == 1 ? "out" : "in"));
+  
   int num_reg = (pin_number / NUM_PIN_EACH_SEL_REG);
   int offset = (pin_number % NUM_PIN_EACH_SEL_REG);
   int addr = base_address + GPFSEL0_OFFSET + (REG_GAP * num_reg);
+  printk(KERN_INFO "ioctl address: %0X\n", addr);
   MEMORY(addr) = WRITE_SEL(offset, mode);
   return 0L;
 }
 
-static ssize_t my_write(struct file * file, const char * buff, size_t count, loff_t *pos)
+static ssize_t my_write(struct file* file, const char* buff, size_t count, loff_t *pos)
 {
+  printk(KERN_INFO "my_write() is called\n");
+
   int mode;
   get_user(mode, &buff[0]);
-
+  
   int num_reg = (pin_number / NUM_PIN_EACH_REG);
   int offset = (pin_number % NUM_PIN_EACH_REG);
   int addr;
 
-  if (mode == PIN_ON) {
+  printk("write pin, number:%d\n", pin_number);
+
+  if (mode == '1') {
+    printk("write mode:set\n");
     addr = base_address + GPSET0_OFFSET + (REG_GAP * num_reg);
-  } else if (mode == PIN_OFF) {
+  } else if (mode == '0') {
+    printk("write mode:clear\n");
     addr = base_address + GPCLR0_OFFSET + (REG_GAP * num_reg);
   }
+  printk(KERN_INFO "write address: %0X\n", addr);
 
   MEMORY(addr) = WRITE_SET_CLR(offset);
   return count;
@@ -195,12 +206,16 @@ static ssize_t my_write(struct file * file, const char * buff, size_t count, lof
 
 static ssize_t my_read(struct file * file, char * buff, size_t count, loff_t *pos)
 {
+  printk(KERN_INFO "my_read() is called\n");
+
   int num_reg = (pin_number / NUM_PIN_EACH_REG);
   int offset = (pin_number % NUM_PIN_EACH_REG);
   int addr = base_address + GPLEV0_OFFSET + (REG_GAP * num_reg);
 
+  printk("read pin, number:%d\n", pin_number);
+
   int value = ((MEMORY(addr) >> offset) & 1);
-  char return_val = value == 0 ? '0' : '1';
+  char return_val = (value == 0 ? '0' : '1');
   put_user(return_val, &buff[0]);
   return count;
 }
