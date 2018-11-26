@@ -3,6 +3,8 @@
 #include <linux/fs.h>
 #include <linux/cdev.h>
 #include <linux/device.h>
+#include <asm/io.h>
+#include <asm/uaccess.h>
 
 #define DRIVER_NAME "my_gpio_driver"
 
@@ -15,19 +17,20 @@
 #define NUM_PIN_EACH_REG 32 /* the number of pins in each register */
 #define REG_GAP 4
 #define RELATIVE_GPIO_ADDRESS 0x00200000
+#define PERIPHERAL_ADDRESS 0x3F000000
+#define GPIO_ADDRESS (PERIPHERAL_ADDRESS + RELATIVE_GPIO_ADDRESS)
 
 #define DEVICE_FILE "/dev/mem"
 #define MEMORY(addr) (*((volatile unsigned int*)(addr)))
 
-#define PIN_MODE_IN 0b000
-#define PIN_MODE_OUT 0b001
+#define PIN_MODE_IN 0
+#define PIN_MODE_OUT 1
 
 #define PIN_ON 1
 #define PIN_OFF 0
 
-#define SEL(num, mode) (mode << (num * 3))
-#define SET(num) (1 << num)
-#define CLR(num) (1 << num)
+#define WRITE_SEL(num, mode) (mode << (num * 3))
+#define WRITE_SET_CLR(num) (1 << num)
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Kazuki Onishi <princeontrojanhorse@gmail.com>");
@@ -39,11 +42,9 @@ static unsigned int major_number; /* the major number of the device */
 static struct cdev my_char_dev; /* character device */
 static struct class* my_char_dev_class = NULL; /* class object */
 
-unsigned int peripheral_address; /* address where mapped peripheral registers start */
-unsigned int gpio_address; /*  */
-
 int file_descriptor;
-unsigned int address;
+unsigned int base_address;
+unsigned int pin_number;
 
 int gpio_init(void);
 void gpio_terminate(void);
@@ -54,20 +55,20 @@ int pin_read(unsigned int pin_number);
 
 static int __init my_init(void);
 static void __exit my_exit(void);
-int my_open(struct inode *inode, struct file *filp);
-int my_close(struct inode *inode, struct file *filp);
-ssize_t my_read(struct file * file, char * buff, size_t count, loff_t *pos);
-ssize_t my_write(struct file * file, const char * buff, size_t count, loff_t *pos);
-long my_ioctl( struct file *filp,unsigned int cmd, unsigned long arg);
+static int my_open(struct inode *inode, struct file *filp);
+static int my_close(struct inode *inode, struct file *filp);
+static ssize_t my_read(struct file * file, char * buff, size_t count, loff_t *pos);
+static ssize_t my_write(struct file * file, const char * buff, size_t count, loff_t *pos);
+static long my_ioctl(struct file *filp,unsigned int cmd, unsigned long arg);
 
 struct file_operations my_file_ops = {
   .owner = THIS_MODULE,
-  //.open = my_open,
-  //.release = my_close,
-  //.read = my_read,
-  //.write = my_write,
-	//.unlocked_ioctl = my_ioctl, /* 64 bits */
-  //.compat_ioctl   = my_ioctl, /* 32 bits */
+  .open = my_open,
+  .release = my_close,
+  .read = my_read,
+  .write = my_write,
+	.unlocked_ioctl = my_ioctl, /* 64 bits */
+  .compat_ioctl   = my_ioctl, /* 32 bits */
 };
 
 
@@ -140,10 +141,68 @@ static void my_exit(void)
   unregister_chrdev_region(dev, NUMBER_MINOR_NUMBER);
 }
 
-int my_open(struct inode *inode, struct file *filp)
+static int my_open(struct inode *inode, struct file *filp)
 {
   printk(KERN_INFO "my_open() is called\n");
+  base_address = (int)ioremap_nocache(GPIO_ADDRESS, PAGE_SIZE);
+  return 0;
+}
 
+int my_close(struct inode *inode, struct file *filp)
+{
+  printk(KERN_INFO "my_close() is called\n");
+  iounmap((void*)base_address);
+  return 0;
+}
+
+struct ioctl_data {
+  int mode;
+  unsigned int pin_number;
+};
+
+static long my_ioctl(struct file *filp,unsigned int cmd, unsigned long arg)
+{
+  printk(KERN_INFO "my_ioctl() is called\n");
+  struct ioctl_data* data = (struct ioctl_data*)arg;
+  int mode = data->mode;
+  pin_number = data->pin_number;
+
+  int num_reg = (pin_number / NUM_PIN_EACH_SEL_REG);
+  int offset = (pin_number % NUM_PIN_EACH_SEL_REG);
+  int addr = base_address + GPFSEL0_OFFSET + (REG_GAP * num_reg);
+  MEMORY(addr) = WRITE_SEL(offset, mode);
+  return 0L;
+}
+
+static ssize_t my_write(struct file * file, const char * buff, size_t count, loff_t *pos)
+{
+  int mode;
+  get_user(mode, &buff[0]);
+
+  int num_reg = (pin_number / NUM_PIN_EACH_REG);
+  int offset = (pin_number % NUM_PIN_EACH_REG);
+  int addr;
+
+  if (mode == PIN_ON) {
+    addr = base_address + GPSET0_OFFSET + (REG_GAP * num_reg);
+  } else if (mode == PIN_OFF) {
+    addr = base_address + GPCLR0_OFFSET + (REG_GAP * num_reg);
+  }
+
+  MEMORY(addr) = WRITE_SET_CLR(offset);
+  return count;
+}
+
+static ssize_t my_read(struct file * file, char * buff, size_t count, loff_t *pos)
+{
+  int num_reg = (pin_number / NUM_PIN_EACH_REG);
+  int offset = (pin_number % NUM_PIN_EACH_REG);
+  int addr = base_address + GPLEV0_OFFSET + (REG_GAP * num_reg);
+
+  int value = ((MEMORY(addr) >> offset) & 1);
+  char return_val = value == 0 ? '0' : '1';
+  put_user(return_val, &buff[0]);
+  return count;
 }
 
 module_init(my_init);
