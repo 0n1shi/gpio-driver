@@ -1,10 +1,6 @@
 # GPIO device driver for studying
 
-# Compile
-
-```bash
-$ make
-```
+This is a kernel module working as a device driver.
 
 # Sample
 
