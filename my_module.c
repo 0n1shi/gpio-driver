@@ -72,7 +72,7 @@ struct file_operations my_file_ops = {
   .release = my_close,
   .read = my_read,
   .write = my_write,
-	.unlocked_ioctl = my_ioctl, /* 64 bits */
+  .unlocked_ioctl = my_ioctl, /* 64 bits */
   .compat_ioctl   = my_ioctl, /* 32 bits */
 };
 
@@ -86,7 +86,7 @@ static int my_init(void)
   printk(KERN_INFO "my_init() is called\n");
 
   /* get not assigned major numbers */
-	alloc_ret = alloc_chrdev_region(&dev, MINOR_NUMBER_START, NUMBER_MINOR_NUMBER, DRIVER_NAME);
+  alloc_ret = alloc_chrdev_region(&dev, MINOR_NUMBER_START, NUMBER_MINOR_NUMBER, DRIVER_NAME);
   if (alloc_ret != 0) {
     printk(KERN_ERR "failed to alloc_chrdev_region()\n");
     return -1;
@@ -95,9 +95,9 @@ static int my_init(void)
   /* get one number from the not-assigend numbers */
   major_number = MAJOR(dev);
   
-  /* register cdev and function table */
+  /* initialize cdev and function table */
   cdev_init(&my_char_dev, &my_file_ops);
-	my_char_dev.owner = THIS_MODULE;
+  my_char_dev.owner = THIS_MODULE;
 
   /* register the driver */
   cdev_err = cdev_add(&my_char_dev, dev, NUMBER_MINOR_NUMBER);
@@ -107,7 +107,7 @@ static int my_init(void)
     return -1;
   }
 
-  /* register as a class */
+  /* register a class */
   my_char_dev_class = class_create(THIS_MODULE, DEVICE_NAME);
   if (IS_ERR(my_char_dev_class)) {
     printk(KERN_ERR "class_create()\n");
