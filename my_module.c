@@ -116,10 +116,8 @@ static int my_init(void)
     return -1;
   }
   
-  /* create "/sys/class/my_device/my_device_*" */
-  for (int minor_number = MINOR_NUMBER_START; minor_number < NUMBER_MINOR_NUMBER; minor_number++) {
-    device_create(my_char_dev_class, NULL, MKDEV(major_number, minor_number), NULL, DEVICE_NAME);
-  }
+  /* create "/sys/class/my_device/my_device" */
+  device_create(my_char_dev_class, NULL, MKDEV(major_number, 0), NULL, DEVICE_NAME);
   
   return 0;
 }
