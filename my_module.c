@@ -79,10 +79,10 @@ struct file_operations my_file_ops = {
 
 static int my_init(void)
 {
-	int alloc_ret;
-	int cdev_err;
-	dev_t dev;
-	
+  int alloc_ret;
+  int cdev_err;
+  dev_t dev;
+
   printk(KERN_INFO "my_init() is called\n");
 
   /* get not assigned major numbers */
@@ -94,7 +94,6 @@ static int my_init(void)
 
   /* get one number from the not-assigend numbers */
   major_number = MAJOR(dev);
-  dev = MKDEV(major_number, MINOR_NUMBER_START);
   
   /* register cdev and function table */
   cdev_init(&my_char_dev, &my_file_ops);
