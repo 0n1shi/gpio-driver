@@ -129,9 +129,7 @@ static void my_exit(void)
   dev_t dev = MKDEV(major_number, MINOR_NUMBER_START);
 
   /* remove "/sys/class/my_device/my_device_*" */
-  for (int minor_number = MINOR_NUMBER_START; minor_number < NUMBER_MINOR_NUMBER; minor_number++) {
-    device_destroy(my_char_dev_class, MKDEV(major_number, minor_number));
-  }
+  device_destroy(my_char_dev_class, MKDEV(major_number, 0));
 
   /* remove class */
   class_destroy(my_char_dev_class);
